@@ -5,8 +5,8 @@ from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import Response, PlainTextResponse
-from starlette.routing import Route
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route, Mount
 import uvicorn
 
 print("🔥 LAMBDA HEADER MCP SERVER BOOTED")
@@ -53,28 +53,20 @@ async def call_tool(name: str, arguments: dict | None):
 # -------------------- SSE --------------------
 sse = SseServerTransport("/messages")
 
-async def handle_sse(request: Request):
-    async with sse.connect_sse(
-        request.scope,
-        request.receive,
-        request._send,
-    ) as (reader, writer):
+async def handle_sse(scope, receive, send):
+    """Raw ASGI handler for SSE endpoint"""
+    async with sse.connect_sse(scope, receive, send) as (reader, writer):
         await server.run(
             reader,
             writer,
             server.create_initialization_options(),
         )
-    # Don't return anything - SSE handles the response
 
-async def handle_messages(request: Request):
-    await sse.handle_post_message(
-        request.scope,
-        request.receive,
-        request._send,
-    )
-    # Don't return anything
+async def handle_messages(scope, receive, send):
+    """Raw ASGI handler for messages endpoint"""
+    await sse.handle_post_message(scope, receive, send)
 
-async def health(_: Request) -> Response:
+async def health(request: Request):
     return PlainTextResponse("OK")
 
 # -------------------- APP --------------------
